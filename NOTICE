@@ -8,8 +8,8 @@ Third-party components used:
 - Spring Framework PetClinic (Apache 2.0) — https://github.com/spring-petclinic/spring-framework-petclinic
 - Jetty 9.4 / Jetty 12 (Apache 2.0) — https://www.eclipse.org/jetty/
 - Eclipse Temurin JDK (GPL v2 with Classpath Exception) — https://adoptium.net/
-- OpenVox (Apache 2.0, Puppet fork) — https://github.com/voxpupuli/openvox
-- HAProxy (GPL v2 / LGPL v2.1) — https://www.haproxy.org/
+- OpenVox (Apache 2.0, Puppet fork) — https://github.com/OpenVoxProject
+- HAProxy (GPL v2+) — https://www.haproxy.org/
 - Jenkins (MIT) — https://www.jenkins.io/
 - Prometheus (Apache 2.0) — https://prometheus.io/
 - Alertmanager (Apache 2.0) — https://prometheus.io/docs/alerting/latest/alertmanager/
