@@ -1,0 +1,17 @@
+---
+# Hiera 5 configuration for legacy-java-modernization-lab OpenVox control repo
+version: 5
+
+hierarchy:
+  - name: "Node-specific data"
+    path: "data/nodes/%{trusted.certname}.yaml"
+
+  - name: "Secrets (gitignored, never commit)"
+    path: "data/secrets.yaml"
+
+  - name: "Common data"
+    path: "data/common.yaml"
+
+defaults:
+  data_hash: yaml_data
+  datadir: hieradata

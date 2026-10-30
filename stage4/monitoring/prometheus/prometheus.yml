@@ -1,0 +1,77 @@
+---
+# Prometheus scrape config for legacy-java-modernization-lab monitoring stack.
+# All images are pinned by sha256 in docker-compose.yml.
+# Scrape targets: JMX (legacy-app + container-app), HAProxy (lb), mysqld (db), node (all hosts).
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: lab
+    environment: lab
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  # JMX exporter — legacy Jetty (legacy-app)
+  - job_name: 'jmx-legacy'
+    static_configs:
+      - targets: ['${LEGACY_HOST}:5556']
+        labels:
+          instance: legacy-app
+          host_type: legacy
+
+  # JMX exporter — container Jetty (container-app)
+  - job_name: 'jmx-container'
+    static_configs:
+      - targets: ['${CONTAINER_HOST}:5556']
+        labels:
+          instance: container-app
+          host_type: container
+
+  # HAProxy built-in Prometheus endpoint (lb)
+  - job_name: 'haproxy'
+    static_configs:
+      - targets: ['${LB_HOST}:8404']
+        labels:
+          instance: lb
+
+  # mysqld_exporter (db)
+  - job_name: 'mysqld'
+    static_configs:
+      - targets: ['${DB_HOST}:9104']
+        labels:
+          instance: db
+
+  # node_exporter — all lab hosts
+  - job_name: 'node'
+    static_configs:
+      - targets: ['${LEGACY_HOST}:9100']
+        labels:
+          instance: legacy-app
+      - targets: ['${CONTAINER_HOST}:9100']
+        labels:
+          instance: container-app
+      - targets: ['${LB_HOST}:9100']
+        labels:
+          instance: lb
+      - targets: ['${DB_HOST}:9100']
+        labels:
+          instance: db
+      - targets: ['${MONITOR_HOST}:9100']
+        labels:
+          instance: monitor
+      - targets: ['${LOG_INDEXER_HOST}:9100']
+        labels:
+          instance: log-indexer
+
+  # Prometheus self-scrape
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

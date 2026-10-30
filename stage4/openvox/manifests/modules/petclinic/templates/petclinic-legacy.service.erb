@@ -1,0 +1,24 @@
+[Unit]
+Description=PetClinic on Jetty 9.4 (legacy)
+After=network.target
+
+[Service]
+User=<%= @run_user %>
+WorkingDirectory=<%= @jetty_base %>
+ExecStart=/usr/bin/java \
+  -javaagent:/opt/jmx/jmx_prometheus_javaagent.jar=5556:/opt/jmx/jmx_config.yml \
+  -Djdbc.url=<%= @jdbc_url %> \
+  -Djdbc.username=<%= @jdbc_username %> \
+  -Djdbc.password=<%= @jdbc_password %> \
+  -XX:MaxRAMPercentage=75.0 \
+  -Dfile.encoding=UTF-8 \
+  -jar <%= @jetty_home %>/start.jar \
+  --jetty.base=<%= @jetty_base %> \
+  jetty.http.port=<%= @port %>
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

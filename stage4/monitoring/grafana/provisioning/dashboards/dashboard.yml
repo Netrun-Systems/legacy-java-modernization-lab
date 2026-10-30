@@ -1,0 +1,17 @@
+---
+# Grafana dashboard provisioning config.
+# Dashboards are loaded from /etc/grafana/dashboards/ in the container.
+
+apiVersion: 1
+
+providers:
+  - name: 'lab'
+    orgId: 1
+    folder: 'Modernization Lab'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

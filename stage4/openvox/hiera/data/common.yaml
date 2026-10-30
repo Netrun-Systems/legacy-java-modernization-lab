@@ -1,0 +1,14 @@
+---
+# Common Hiera data — values shared across all lab nodes
+# Secrets belong in a Vault lookup, not here; this is lab-only.
+
+petclinic::registry: "${REGISTRY_HOST}"
+petclinic::image_name: "petclinic"
+petclinic::port: 8080
+
+mysql::primary_host: "${DB_HOST}"
+mysql::port: 3306
+mysql::database: "petclinic"
+mysql::username: "petclinic"
+# mysql::password is in hiera/data/secrets.yaml (gitignored)
+# In production this would use a Vault backend lookup

@@ -1,0 +1,42 @@
+---
+# JMX exporter configuration for Spring PetClinic on Jetty.
+# Applied to both legacy-app and container-app
+# so metric names are identical on both hosts (parity requirement).
+#
+# javaagent port: 5556
+# Used by: -javaagent:/opt/jmx/jmx_prometheus_javaagent.jar=5556:/opt/jmx/jmx_config.yml
+
+startDelaySeconds: 0
+ssl: false
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  # JVM memory pools
+  - pattern: "java.lang<type=Memory><>(HeapMemoryUsage|NonHeapMemoryUsage): (.*)"
+    name: jvm_memory_$1_bytes
+    type: GAUGE
+    help: "JVM $1 memory in bytes"
+
+  # GC pause time
+  - pattern: "java.lang<type=GarbageCollector, name=(.+)><CollectionTime>(.*)"
+    name: jvm_gc_collection_seconds_total
+    labels:
+      gc: "$1"
+    type: COUNTER
+
+  # Thread counts
+  - pattern: "java.lang<type=Threading><>(ThreadCount|DaemonThreadCount|PeakThreadCount)"
+    name: jvm_threads_$1
+    type: GAUGE
+
+  # Jetty request statistics (threadpool)
+  - pattern: "org.eclipse.jetty.util.thread<type=queuedthreadpool, id=(.+)><>(threads|idleThreads|queueSize)"
+    name: jetty_threadpool_$2
+    labels:
+      pool: "$1"
+    type: GAUGE
+
+  # Catch-all for other mbeans — kept so the parity check has identical
+  # metric names on both legacy (Jetty 9.4) and container (Jetty 12.1).
+  - pattern: ".*"

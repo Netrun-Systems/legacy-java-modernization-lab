@@ -1,0 +1,30 @@
+---
+# Alertmanager config for legacy-java-modernization-lab.
+# Internal-only lab — all notifications stay on the LAN.
+# webhook-sink container (webhook-sink) persists every payload to
+# /data/webhooks.jsonl on webhook-sink-data volume.
+# No credentials, no external URLs.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'instance']
+  group_wait:      30s
+  group_interval:  5m
+  repeat_interval: 1h
+  receiver: 'webhook-sink'
+
+receivers:
+  - name: 'webhook-sink'
+    webhook_configs:
+      - url: 'http://webhook-sink:5001/webhook'
+        send_resolved: true
+
+inhibit_rules:
+  # Suppress warnings when a critical for the same instance is firing.
+  - source_matchers:
+      - 'severity = critical'
+    target_matchers:
+      - 'severity = warning'
+    equal: ['instance']

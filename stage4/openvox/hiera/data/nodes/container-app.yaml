@@ -1,0 +1,23 @@
+---
+# Hiera node data for container-app (Jetty 12.1 / container-app host)
+# IP: ${CONTAINER_HOST} | Ubuntu 24.04
+#
+# KEY: image_digest is updated here after each Jenkins build (Stage 3).
+# OpenVox enforces this exact digest — if Docker pulls a different image
+# (e.g., a registry overwrite), OpenVox will stop the container and repull.
+# This is the "immutable artifact" gate for PCI 11.5.2 change detection.
+#
+# After a new Jenkins build, run:
+#   ovox agent --test --debug  (on container-app)
+# and confirm the running container's digest matches this value.
+
+petclinic::mode: "container"
+petclinic::jetty_version: "12.1.14"
+petclinic::jetty_port: 8080
+
+# Updated after each Stage 3 pipeline run.
+# Replace with the sha256 from the Jenkins "Record commit→digest" stage output.
+petclinic::image_digest: "sha256:f1a2edaec14300cd4e3cd29966c7248ef5f7de024bf12e71e79ef1e4af30203d"
+# Build 26, commit 510ea50, 2026-10-30T14:50:08Z
+
+petclinic::jdbc_url: "jdbc:mysql://${DB_HOST}:3306/petclinic?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true"

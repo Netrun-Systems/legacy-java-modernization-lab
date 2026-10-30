@@ -1,0 +1,30 @@
+[Unit]
+Description=PetClinic on Jetty 12.1 (container, digest-pinned)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=on-failure
+RestartSec=5s
+ExecStartPre=-/usr/bin/docker stop petclinic
+ExecStartPre=-/usr/bin/docker rm petclinic
+ExecStart=/usr/bin/docker run \
+  --name petclinic \
+  --rm \
+  -p <%= @port %>:8080 \
+  -p 5556:5556 \
+  -e JDBC_DRIVER_CLASS=com.mysql.cj.jdbc.Driver \
+  -e JDBC_URL=<%= @jdbc_url %> \
+  -e JDBC_USER=<%= @jdbc_username %> \
+  -e JDBC_PASSWORD=<%= @jdbc_password %> \
+  -e DB_SCRIPT=mysql \
+  -e JPA_DATABASE=MYSQL \
+  -e JAVA_TOOL_OPTIONS="-javaagent:/jmx/jmx_prometheus_javaagent.jar=5556:/jmx/jmx_config.yml" \
+  -v /opt/jmx:/jmx:ro \
+  <%= @registry %>/<%= @image_name %>@<%= @image_digest %>
+ExecStop=/usr/bin/docker stop petclinic
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

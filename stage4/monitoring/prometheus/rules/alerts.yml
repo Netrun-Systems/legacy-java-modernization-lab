@@ -1,0 +1,75 @@
+---
+# Modernization Lab alert rules — 6 rules covering the monitoring parity requirement.
+# Analogue: PCI 10.7.2 (detect/report failures in critical systems within 1 min).
+
+groups:
+  - name: lab_availability
+    rules:
+
+      # Rule 1 — JMX exporter down (either host)
+      # Fires when Prometheus can no longer scrape a JMX target.
+      # Maps to PCI 10.7.2: security-critical system monitoring failure.
+      - alert: JmxExporterDown
+        expr: absent(jvm_memory_used_bytes{job=~"jmx-.*"})
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "JMX exporter down on {{ $labels.job }}"
+          description: "Prometheus cannot scrape {{ $labels.job }}. The JVM or its exporter has stopped."
+
+      # Rule 2 — Application JVM heap > 80 %
+      # Fires when old-gen or total heap usage crosses threshold.
+      - alert: HighJvmHeapUsage
+        expr: >
+          (jvm_memory_used_bytes{area="heap"} /
+           jvm_memory_max_bytes{area="heap"}) > 0.80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High JVM heap on {{ $labels.instance }}"
+          description: "JVM heap usage is {{ humanizePercentage $value }} on {{ $labels.instance }}."
+
+      # Rule 3 — HAProxy backend entirely down
+      # Fires when all servers in the petclinic backend are DOWN.
+      - alert: HAProxyAllBackendsDown
+        expr: haproxy_backend_active_servers{proxy="petclinic"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "All HAProxy backends down"
+          description: "Zero active servers in the 'petclinic' backend. Traffic is being refused."
+
+      # Rule 4 — mysqld_exporter down
+      # absent() fires when the time series disappears entirely.
+      - alert: MysqlExporterDown
+        expr: absent(mysql_up)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "mysqld_exporter is not reachable"
+          description: "Prometheus lost contact with mysqld_exporter on db."
+
+      # Rule 5 — MySQL server itself reports not-up
+      - alert: MysqlDown
+        expr: mysql_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL server down on {{ $labels.instance }}"
+          description: "mysqld_exporter reports mysql_up=0. The MySQL daemon may have crashed."
+
+      # Rule 6 — node CPU sustained > 80 %
+      - alert: HighNodeCpu
+        expr: >
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU usage is above 80% for 3 consecutive minutes on {{ $labels.instance }}."
