@@ -1,0 +1,278 @@
+// legacy-java-modernization-lab Stage 3 Jenkins pipeline
+// Builds PetClinic WAR, builds signed+scanned container image on Jetty 12.1.14,
+// pushes to lab registry at REGISTRY_HOST:5000.
+//
+// Supply-chain notes:
+//   Trivy: pinned to aquasec/trivy:0.67.0 (pre-compromise; NOT 0.69.4/0.69.5/0.69.6)
+//   Kaniko: archived June 2025 - not used. Build via Docker BuildKit on DinD.
+//   cosign: key-based (Jenkins cannot issue OIDC tokens for Fulcio).
+//   No docker.sock mount on production agents. Lab uses DinD sidecar.
+//
+// Parameters (set via Jenkins UI or trigger):
+//   PETCLINIC_TAG : git tag to build (default v5.3.22)
+//   REGISTRY_HOST : registry hostname from Docker network (default: lab-registry)
+
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'PETCLINIC_TAG', defaultValue: 'v5.3.22', description: 'PetClinic tag to build')
+    string(name: 'REGISTRY_HOST', defaultValue: 'lab-registry', description: 'Registry hostname (Docker network name)')
+  }
+
+  environment {
+    REGISTRY        = "${params.REGISTRY_HOST}:5000"
+    IMAGE_NAME      = "${params.REGISTRY_HOST}:5000/petclinic"
+    // Images pinned by sha256 digest (resolved 2026-10-29) — tags are mutable, digests are not
+    TRIVY_IMAGE     = "aquasec/trivy@sha256:94711c60051c6cab848a292e3a67f62623fcee361b2bb661f43b17184f4afdac"
+    SYFT_IMAGE      = "anchore/syft@sha256:f1099806495b4d2300adf03887bdfb69230c36a5e077061a12ee292bcd9bfd62"
+    MAVEN_CENTRAL   = "https://repo.maven.apache.org/maven2"
+    BUILD_TS        = sh(script: 'date -u +%Y%m%dT%H%M%SZ', returnStdout: true).trim()
+  }
+
+  options {
+    ansiColor('xterm')
+    timestamps()
+    timeout(time: 40, unit: 'MINUTES')
+    buildDiscarder(logRotator(numToKeepStr: '10'))
+  }
+
+  stages {
+
+    // -----------------------------------------------------------------
+    stage('Checkout') {
+    // -----------------------------------------------------------------
+      steps {
+        checkout scm
+        script {
+          env.GIT_COMMIT_SHORT = sh(
+            script: 'git rev-parse --short HEAD 2>/dev/null || echo unknown',
+            returnStdout: true
+          ).trim()
+          echo "Commit: ${env.GIT_COMMIT_SHORT}"
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------
+    stage('Build Image') {
+    // -----------------------------------------------------------------
+    // Builds the WAR inside the Dockerfile builder stage, then packages
+    // into the Jetty 12.1.14 ee8 runtime. BuildKit cache keeps Maven
+    // deps across runs.
+    // -----------------------------------------------------------------
+      steps {
+        script {
+          env.IMAGE_TAG = "${env.IMAGE_NAME}:${env.GIT_COMMIT_SHORT}-${env.BUILD_TS}"
+          env.IMAGE_TAG_LATEST = "${env.IMAGE_NAME}:latest"
+
+          sh """
+            docker build \\
+              --target jetty12 \\
+              --build-arg GIT_COMMIT=${env.GIT_COMMIT_SHORT} \\
+              --build-arg BUILD_NUMBER=${env.BUILD_NUMBER} \\
+              --progress=plain \\
+              -t "${env.IMAGE_TAG}" \\
+              -t "${env.IMAGE_TAG_LATEST}" \\
+              -f stage3/Dockerfile \\
+              .
+          """
+          // Capture the exact digest produced by this build
+          env.IMAGE_DIGEST = sh(
+            script: "docker inspect --format='{{index .RepoDigests 0}}' '${env.IMAGE_TAG}' 2>/dev/null || docker image inspect --format='{{.Id}}' '${env.IMAGE_TAG}'",
+            returnStdout: true
+          ).trim()
+          echo "Image digest (local): ${env.IMAGE_DIGEST}"
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------
+    stage('Export image tar') {
+    // -----------------------------------------------------------------
+    // DinD has no /var/run/docker.sock in the Jenkins container.
+    // Export the image to a tar so Syft and Trivy can scan via bind-mount.
+    // -----------------------------------------------------------------
+      steps {
+        sh "docker save '${env.IMAGE_TAG}' -o petclinic-${env.GIT_COMMIT_SHORT}.tar"
+        echo "Image exported to petclinic-${env.GIT_COMMIT_SHORT}.tar"
+      }
+    }
+
+    // -----------------------------------------------------------------
+    stage('SBOM — CycloneDX via Syft') {
+    // -----------------------------------------------------------------
+    // Generates a CycloneDX SBOM for PCI 6.3.2 (inventory of bespoke
+    // software and third-party components, mandatory since 31 Mar 2025).
+    // Syft pinned by sha256 digest (mutable tags provide no supply-chain guarantee).
+    // -----------------------------------------------------------------
+      steps {
+        script {
+          sh """
+            docker run --rm \\
+              -v \$(pwd):/work \\
+              ${env.SYFT_IMAGE} \\
+              docker-archive:/work/petclinic-${env.GIT_COMMIT_SHORT}.tar \\
+              -o cyclonedx-json=/work/sbom-${env.GIT_COMMIT_SHORT}.json
+          """
+          archiveArtifacts artifacts: "sbom-${env.GIT_COMMIT_SHORT}.json", fingerprint: true
+          echo "SBOM written: sbom-${env.GIT_COMMIT_SHORT}.json"
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------
+    stage('Scan — Trivy (digest-pinned, pre-compromise)') {
+    // -----------------------------------------------------------------
+    // Gate: fail on CRITICAL or HIGH with fixes available.
+    // Trivy 0.69.4/0.69.5/0.69.6 are compromised (2026-03-19 supply-chain
+    // attack). This pipeline is pinned to 0.67.0 by sha256 digest so
+    // a force-pushed tag cannot substitute the malicious build.
+    // -----------------------------------------------------------------
+      steps {
+        script {
+          // --exit-code 1: gate on CRITICAL/HIGH with fixes available.
+          // .trivyignore lists CVEs in frozen upstream JARs (spring-framework 5.3.x,
+          // jackson 2.13.x, logback 1.2.x) that cannot be patched without an upstream
+          // upgrade.  These are accepted risks documented in .trivyignore with rationale.
+          // --ignore-unfixed suppresses findings that have no available fix at all.
+          // Any CRITICAL/HIGH not in .trivyignore AND not unfixed will fail this stage.
+          def trivyExit = sh(
+            script: """
+              docker run --rm \\
+                -v \$(pwd):/work \\
+                ${env.TRIVY_IMAGE} \\
+                --timeout 15m \\
+                image \\
+                --severity CRITICAL,HIGH \\
+                --ignore-unfixed \\
+                --ignorefile /work/.trivyignore \\
+                --format table \\
+                --output /work/trivy-report-${env.GIT_COMMIT_SHORT}.txt \\
+                --exit-code 1 \\
+                --input /work/petclinic-${env.GIT_COMMIT_SHORT}.tar
+            """,
+            returnStatus: true
+          )
+
+          // Print scan output to console
+          sh "cat trivy-report-${env.GIT_COMMIT_SHORT}.txt || true"
+          archiveArtifacts artifacts: "trivy-report-${env.GIT_COMMIT_SHORT}.txt", allowEmptyArchive: true
+
+          if (trivyExit != 0) {
+            error("Trivy gate FAILED: CRITICAL or HIGH vulnerabilities found that are not in .trivyignore. " +
+                  "See trivy-report-${env.GIT_COMMIT_SHORT}.txt for details.")
+          }
+          echo "Trivy gate PASSED (all remaining CRITICAL/HIGH are in .trivyignore with documented rationale)."
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------
+    stage('Push to Registry') {
+    // -----------------------------------------------------------------
+      steps {
+        sh """
+          docker push "${env.IMAGE_TAG}"
+          docker push "${env.IMAGE_TAG_LATEST}"
+        """
+        script {
+          // Get the registry digest (not the local image ID)
+          env.REGISTRY_DIGEST = sh(
+            script: """
+              docker inspect --format='{{index .RepoDigests 0}}' "${env.IMAGE_TAG}" 2>/dev/null | \\
+              grep -o 'sha256:[a-f0-9]*' || \\
+              docker manifest inspect "${env.IMAGE_TAG}" 2>/dev/null | \\
+              grep -A2 '"mediaType"' | grep 'digest' | head -1 | grep -o 'sha256:[a-f0-9]*'
+            """,
+            returnStdout: true
+          ).trim()
+          echo "Registry digest: ${env.REGISTRY_DIGEST}"
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------
+    stage('Sign — cosign key-based') {
+    // -----------------------------------------------------------------
+    // Signs the image by digest using a lab-generated key pair.
+    // Private key is injected via Jenkins credential (not in git).
+    // Public key (keys/cosign.pub) is committed for verify.
+    // In production: key would live in KMS; public Rekor may be
+    // excluded from CDE segmentation policy.
+    // -----------------------------------------------------------------
+      steps {
+        withCredentials([string(credentialsId: 'cosign-private-key-password', variable: 'COSIGN_PASSWORD')]) {
+          script {
+            // Sign by registry digest (tag is mutable; digest is not — PCI 6.5.1.b)
+            // cosign.key is mounted from the compose secrets at /run/secrets/cosign.key
+            // Key at /var/jenkins_home/cosign.key (piped into the named volume with
+            // correct jenkins:jenkins 600 ownership at lab setup; /workspace/keys/cosign.key
+            // is 600 uid=65532 — Docker Desktop Windows path remapping blocks chmod there)
+            sh """
+              COSIGN_PASSWORD="\${COSIGN_PASSWORD}" \\
+              cosign sign \\
+                --key /var/jenkins_home/cosign.key \\
+                --yes \\
+                --allow-insecure-registry \\
+                --allow-http-registry \\
+                "${env.IMAGE_NAME}@${env.REGISTRY_DIGEST}"
+            """
+          }
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------
+    stage('Verify Signature') {
+    // -----------------------------------------------------------------
+      steps {
+        sh """
+          cosign verify \\
+            --key /var/jenkins_home/cosign.pub \\
+            --allow-insecure-registry \\
+            --allow-http-registry \\
+            "${env.IMAGE_NAME}@${env.REGISTRY_DIGEST}" \\
+            2>&1 | tee cosign-verify-${env.GIT_COMMIT_SHORT}.txt
+        """
+        archiveArtifacts artifacts: "cosign-verify-${env.GIT_COMMIT_SHORT}.txt"
+      }
+    }
+
+    // -----------------------------------------------------------------
+    stage('Record commit→digest') {
+    // -----------------------------------------------------------------
+    // Produces the traceability record that PCI 6.5.1.b requires:
+    // changes traceable from commit to artifact.
+    // -----------------------------------------------------------------
+      steps {
+        sh """
+          TS=\$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "\${TS} commit=${env.GIT_COMMIT_SHORT} build=${env.BUILD_NUMBER} image=${env.IMAGE_TAG} digest=${env.REGISTRY_DIGEST}" >> digest-log.txt
+          cat digest-log.txt
+        """
+        archiveArtifacts artifacts: "digest-log.txt"
+      }
+    }
+
+  }
+
+  post {
+    success {
+      echo """
+=== Stage 3 PASSED ===
+  Image    : ${env.IMAGE_TAG}
+  Digest   : ${env.REGISTRY_DIGEST}
+  SBOM     : sbom-${env.GIT_COMMIT_SHORT}.json
+  Trivy    : PASSED (no CRITICAL/HIGH with fixes)
+  Signed   : cosign key-based
+  Registry : ${env.REGISTRY}
+
+Next: update Hiera container_app::image_digest in stage4/openvox/hiera/data/nodes/container-app.yaml
+"""
+    }
+    failure {
+      echo "=== Stage 3 FAILED — see console output above ==="
+    }
+  }
+}

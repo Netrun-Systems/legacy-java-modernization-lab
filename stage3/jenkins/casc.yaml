@@ -1,0 +1,54 @@
+jenkins:
+  systemMessage: "Legacy Java Modernization Lab — Stage 3 CI/CD pipeline"
+  numExecutors: 2
+  mode: NORMAL
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - string:
+              scope: GLOBAL
+              id: cosign-private-key-password
+              description: "Cosign private key passphrase"
+              secret: "${COSIGN_PASSWORD}"
+          - file:
+              scope: GLOBAL
+              id: cosign-private-key-file
+              description: "Cosign private key (cosign.key)"
+              fileName: "cosign.key"
+              secretBytes: "${readFile:/run/secrets/cosign_key_b64}"
+
+jobs:
+  - script: |
+      pipelineJob('petclinic-pipeline') {
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote { url('file:///workspace') }
+                branch('*/master')
+              }
+            }
+            scriptPath('stage3/Jenkinsfile')
+          }
+        }
+        triggers {
+          scm('H/5 * * * *')
+        }
+      }
+
+unclassified:
+  ansiColorBuildWrapper:
+    globalColorMapName: "xterm"
+  timestamper:
+    allPipelines: true
