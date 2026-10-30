@@ -1,0 +1,40 @@
+# Secrets and local config
+.env
+.env.monitoring
+*.key
+*.pem
+*.p12
+cosign.key
+cosign_key_b64
+admin_password.txt
+stage4/openvox/hiera/data/secrets.yaml
+
+# Build / runtime artifacts
+*.class
+*.war
+target/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Logs
+*.log
+logs/
+
+# Terraform / IaC state
+*.tfstate
+*.tfstate.backup
+.terraform/
