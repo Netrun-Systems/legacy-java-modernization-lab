@@ -1,0 +1,22 @@
+legacy-java-modernization-lab
+Copyright (c) 2026 Netrun Systems
+
+This project includes software and configuration derived from open-source
+components. All third-party components retain their original licenses.
+
+Third-party components used:
+- Spring Framework PetClinic (Apache 2.0) — https://github.com/spring-petclinic/spring-framework-petclinic
+- Jetty 9.4 / Jetty 12 (Apache 2.0) — https://www.eclipse.org/jetty/
+- Eclipse Temurin JDK (GPL v2 with Classpath Exception) — https://adoptium.net/
+- OpenVox (Apache 2.0, Puppet fork) — https://github.com/voxpupuli/openvox
+- HAProxy (GPL v2 / LGPL v2.1) — https://www.haproxy.org/
+- Jenkins (MIT) — https://www.jenkins.io/
+- Prometheus (Apache 2.0) — https://prometheus.io/
+- Alertmanager (Apache 2.0) — https://prometheus.io/docs/alerting/latest/alertmanager/
+- Grafana (AGPL v3) — https://grafana.com/
+- Splunk Enterprise (Splunk General Terms) — https://www.splunk.com/
+- cosign / Sigstore (Apache 2.0) — https://www.sigstore.dev/
+- Trivy (Apache 2.0) — https://aquasecurity.github.io/trivy/
+
+The application workload (Spring PetClinic WAR) is a well-known open-source
+demo application and contains no proprietary business logic.
