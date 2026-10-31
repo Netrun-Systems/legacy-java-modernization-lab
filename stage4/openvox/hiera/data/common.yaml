@@ -2,11 +2,14 @@
 # Common Hiera data — values shared across all lab nodes
 # Secrets belong in a Vault lookup, not here; this is lab-only.
 
-petclinic::registry: "${REGISTRY_HOST}"
+# Replace workstation.lan.example:5000 with your registry address (from $REGISTRY_HOST in .env).
+# Puppet/Hiera does not expand shell ${} variables; use a literal value here.
+petclinic::registry: "workstation.lan.example:5000"
 petclinic::image_name: "petclinic"
 petclinic::port: 8080
 
-mysql::primary_host: "${DB_HOST}"
+# Replace db.lab.example with your db hostname (from $DB_HOST in .env).
+mysql::primary_host: "db.lab.example"
 mysql::port: 3306
 mysql::database: "petclinic"
 mysql::username: "petclinic"

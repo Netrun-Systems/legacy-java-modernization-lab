@@ -1,6 +1,8 @@
 #!/bin/bash
 # setup_node_exporter.sh — installs node_exporter 1.8.2 on an Ubuntu 24.04 CT.
-# Run on each target CT: 730, 731, 732, 733, 734.
+# Run on each target CT: 730 (legacy-app), 731 (container-app), 732 (lb),
+#   733 (monitor), 734 (db), 735 (log-indexer).
+# CT IDs above are examples from .env.example; substitute your own values.
 # Pin: sha256 verified against the official checksum file.
 #
 # Usage: pct exec <CTID> -- bash < setup_node_exporter.sh

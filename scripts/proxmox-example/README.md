@@ -36,7 +36,6 @@ Before running, edit the following variables at the top of each script:
 | legacy-app | legacy-app | Jetty 9.4 legacy app host |
 | container-app | container-app | Jetty 12 container-app host + Docker |
 | lb | lb | HAProxy 2.x load balancer |
-| config-mgmt | config-mgmt | OpenVox configuration management server |
 | db | db | MySQL 8.x database |
 | monitor | monitor | Prometheus + Alertmanager + Grafana |
 | log-indexer | log-indexer | Splunk Enterprise log indexing |

@@ -133,7 +133,7 @@ Commit map (for orientation): `cffa7de` scaffold; `46e9de9` phase 1 results; `c5
 - **Symptom:** `groovy.lang.MissingPropertyException: No such property: <invisible char> for class: groovy.lang.Binding`, in `WorkflowScript:1`.
 - **Root cause:** PowerShell `WriteAllText(..., UTF8)` emits EF BB BF; Groovy parsed it as a property.
 - **Fix:** rewrite with `UTF8Encoding($false)`. Coordinator note: this is a Windows editor artifact.
-- **By hand:** `head -c3 | xxd` is a ten-second check. Mojibake (`â€”`) from the same round trip remains in comments and one stage name.
+- **By hand:** `head -c3 | xxd` is a ten-second check — a Windows UTF-8 BOM round-trip can inject mojibake in any file it touches; grep the tree before closing the ticket.
 
 ### F20 `32669b0` New CVE from the injected jar (build 23)
 - **Symptom:** gate failed; the only un-ignored ID in the report was `CVE-2022-45868`.

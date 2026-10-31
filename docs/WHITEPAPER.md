@@ -57,7 +57,7 @@ The delivery strategy, in order, each step shippable alone:
  |        +------------------------------------------------> lab-registry :5000   |
  |                                                          (registry:2, plain HTTP) |
  +-----------------------------------------------------------------------------------+
-                                  |  LAN  10.0.lab.0/24 (example; replace with your LAN subnet)
+                                  |  LAN  10.0.0.0/24 (example; replace with your LAN subnet)
                                   |  LXCs pull  registry.lab.example:5000/petclinic@sha256:...
  HYPERVISOR HOST hypervisor.lab.example  (Proxmox; also the NAT gateway for the CTs)
  +-----------------------------------------------------------------------------------+
@@ -275,7 +275,7 @@ Registry tag list at 03:50Z shows the SCM poll built an image for each commit an
 - SBOM contents were never opened; component counts are not recorded.
 - Trivy fetches its vulnerability DB (about 131 MiB) at scan time. The scanner binary is pinned; its data is not.
 - The cosign key is copied into the `jenkins-home` volume by hand; no script in the repo does it. After `092489f` the key pair was replaced, and the passphrase and Jenkins admin password are `${VAR}` references to a gitignored `.env` (old values are dead but remain in local git history). `scripts/gen-keys.sh` still says "empty passphrase".
-- Mojibake (`â€”`) remains in Jenkinsfile/Dockerfile comments and one stage name from a PowerShell encoding round trip. Cosmetic.
+- The PowerShell UTF-8 BOM round-trip that caused the Mojibake issue (see Retrospective F19) has been corrected; no mojibake sequences remain in the repository.
 
 ## 6. Stage 4: OpenVox/Hiera digest pinning and HAProxy weighted canary, cutover, rollback
 

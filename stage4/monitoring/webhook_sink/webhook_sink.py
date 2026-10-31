@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import datetime
+from datetime import timezone
 import pathlib
 
 DATA_FILE = pathlib.Path("/data/webhooks.jsonl")
@@ -22,7 +23,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             payload = {"raw": body.decode(errors="replace")}
         entry = {
-            "ts": datetime.datetime.utcnow().isoformat() + "Z",
+            "ts": datetime.datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "path": self.path,
             "payload": payload,
         }

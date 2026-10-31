@@ -56,9 +56,9 @@ WorkingDirectory=${JETTY_BASE}
 ExecStart=/usr/bin/java \\
   -Djetty.base=${JETTY_BASE} \\
   -Djetty.port=8080 \\
-  -Dspring.datasource.url=jdbc:mysql://${DB_HOST}:3306/petclinic \\
-  -Dspring.datasource.username=petclinic \\
-  -Dspring.datasource.password=petclinic \\
+  -Djdbc.url=jdbc:mysql://${DB_HOST}:3306/petclinic \\
+  -Djdbc.username=petclinic \\
+  -Djdbc.password=petclinic \\
   -jar ${JETTY_HOME}/start.jar
 Restart=on-failure
 RestartSec=5

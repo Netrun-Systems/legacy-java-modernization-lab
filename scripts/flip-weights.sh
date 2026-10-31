@@ -15,7 +15,7 @@
 set -euo pipefail
 
 HAPROXY_IP="${LB_HOST}"
-HAPROXY_CT="732"
+HAPROXY_CT="${CT_LB:-732}"   # override via CT_LB env var; 732 is the example default in .env.example
 HYPERVISOR="root@${HYPERVISOR_HOST}"
 BACKEND="petclinic"
 

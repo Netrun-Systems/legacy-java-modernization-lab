@@ -14,10 +14,10 @@ node 'lb' {
   include petclinic::haproxy_node
 }
 
-node 'db-primary' {
-  include petclinic::mysql_primary
-}
-
-node 'db-replica' {
-  include petclinic::mysql_replica
-}
+# Note: the db host (MySQL 8) is provisioned outside OpenVox in this lab.
+# No petclinic::mysql class exists in this module; add one here when you
+# want OpenVox to manage the database node.
+#
+# node 'db' {
+#   include petclinic::mysql   # class not yet implemented
+# }

@@ -14,4 +14,4 @@ hierarchy:
 
 defaults:
   data_hash: yaml_data
-  datadir: hieradata
+  datadir: "."   # relative to this file; paths above already start with data/

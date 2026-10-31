@@ -23,7 +23,7 @@ No proprietary code is included.
   │  (Proxmox; also the NAT gateway for the lab CTs)      │  │
   │                                                       │  │
   │  ┌────────────────────────────────────────────────┐   │  │
-  │  │  LAN  10.0.lab.0/24 (example; use your subnet) │   │  │
+  │  │  LAN  10.0.0.0/24 (example; use your subnet)   │   │  │
   │  │                                                │   │  │
   │  │  legacy-app     (CT_LEGACY)    Jetty 9.4 WAR   │   │  │
   │  │  container-app  (CT_CONTAINER) Docker / Jetty  │   │  │
@@ -84,7 +84,10 @@ bash stage4/scripts/provision-legacy.sh
 
 # On db: provision MySQL 8 (then configure datasource via OpenVox)
 # See stage4/openvox/ for the Puppet manifests
-bash stage4/openvox/site.pp   # apply via OpenVox agent on each CT
+# Apply masterless (run on each CT from repo root):
+puppet apply --hiera_config=stage4/openvox/hiera/hiera.yaml \
+             --modulepath=stage4/openvox/manifests/modules \
+             stage4/openvox/manifests/site.pp
 ```
 
 ### 4. Stage 2 — containerize
@@ -93,10 +96,13 @@ bash stage4/openvox/site.pp   # apply via OpenVox agent on each CT
 # On workstation: explore the Jetty 9→12 EE8 migration
 bash phase1/phase1-jetty12-ee8.sh
 
+# Generate cosign key pair (once; skip if keys/cosign.key already exists)
+bash scripts/gen-keys.sh
+
 # Build and sign the container image
 cd stage2
 docker build -t ${REGISTRY_HOST}/petclinic:latest .
-cosign sign --key cosign.key ${REGISTRY_HOST}/petclinic:latest
+cosign sign --key ../keys/cosign.key ${REGISTRY_HOST}/petclinic:latest
 ```
 
 ### 5. Stage 3 — CI/CD
@@ -144,6 +150,7 @@ docker compose up -d   # runs on monitor CT
 | `scripts/flip-weights.sh` | HAProxy weight shift via admin socket over SSH |
 | `.env.example` | Environment variable shape reference |
 | `scripts/proxmox-example/` | Proxmox LXC provisioning scripts (not tested on non-Proxmox) |
+| [Published case study](https://www.netrunsystems.com/blog/legacy-java-modernization-case-study) | Full narrative write-up of this lab with lessons learned |
 
 ## Security notes
 
